@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom';
 import { applyMiddleware, createStore, compose, bindActionCreators } from 'redux';
 import { Provider, connect } from 'react-redux';
 import Immutable from 'immutable';
+import starMiddleware from 'redux-star';
 
 const ActionTypes = {
   GET_PAGE_START: 'GET_PAGE_START',
@@ -10,12 +11,13 @@ const ActionTypes = {
 };
 
 const ActionCreators = {
-  getPageStart() {
-    return {
-      type: ActionTypes.GET_PAGE_START
-    };
+  // Action creators can be regular generators...
+  getPageStart: function* () {
+    yield { type: ActionTypes.GET_PAGE_START };
+    // could have more yields in here too
   },
 
+  // ...plain actions
   getPageEnd({ articles, success }) {
     return {
       type: ActionTypes.GET_PAGE_END,
@@ -24,6 +26,7 @@ const ActionCreators = {
     }
   },
 
+  // ...or async generators
   triggerGetPage: async function* (page = 0) {
     yield ActionCreators.getPageStart();
 
@@ -31,10 +34,7 @@ const ActionCreators = {
       let articles = await fetch(`https://jsonplaceholder.typicode.com/posts`);
       articles = await articles.json();
 
-      yield ActionCreators.getPageEnd({
-        articles,
-        success: true
-      });
+      yield ActionCreators.getPageEnd({ articles, success: true });
     } catch (e) {
       yield ActionCreators.getPageEnd({ success: false });
     }
@@ -95,24 +95,10 @@ ArticleList = connect(
   }
 )(ArticleList);
 
-function asyncThunkMiddleware({ dispatch, getState }) {
-  return function(next) {
-    return async function (action) {
-      if (action.constructor.name !== 'AsyncGenerator') {
-        return next(action);
-      }
-
-      for await (let a of action) {
-        dispatch(a);
-      }
-    }
-  }
-}
-
 const store = createStore(
   Reducer,
   compose(
-    applyMiddleware(asyncThunkMiddleware),
+    applyMiddleware(starMiddleware),
     window.devToolsExtension ? window.devToolsExtension(): f => f
   )
 );
