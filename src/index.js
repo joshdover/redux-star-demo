@@ -25,18 +25,19 @@ const ActionCreators = {
   },
 
   triggerGetPage: async function* (page = 0) {
-      yield ActionCreators.getPageStart();
+    yield ActionCreators.getPageStart();
 
-      try {
-        let articles = await fetch(`/articles`);
-        articles = await articles.json();
-        yield ActionCreators.getPageEnd({
-          articles: res.articles,
-          success: true
-        });
-      } catch (e) {
-        yield ActionCreators.getPageEnd({ success: false });
-      }
+    try {
+      let articles = await fetch(`https://jsonplaceholder.typicode.com/posts`);
+      articles = await articles.json();
+
+      yield ActionCreators.getPageEnd({
+        articles,
+        success: true
+      });
+    } catch (e) {
+      yield ActionCreators.getPageEnd({ success: false });
+    }
   },
 };
 
@@ -61,29 +62,32 @@ function Reducer(state = initialState, action) {
   }
 }
 
-let ArticleList = React.createClass({
-  componentWillMount() {
+class ArticleList extends React.Component {
+  componentDidMount() {
     this.props.triggerGetPage();
-  },
+  }
 
   render() {
+    const { articles } = this.props;
     return (
       <ul>
         {
-          this.props.articles.map((article) => (
-            <li key={ article.url }><a href={ article.url }>{ article.title }</a></li>
+          articles.map((article) => (
+            <li key={ article.id }>
+              { article.title }
+            </li>
           ))
         }
       </ul>
-    );
+    )
   }
-});
+}
 
 ArticleList = connect(
   function mapStateToProps(state) {
     return {
-      loading: state.get('articles').get('loadingArticleList'),
-      articles: state.get('articles').get('articleList')
+      loading: state.get('loadingArticleList'),
+      articles: state.get('articleList')
     };
   },
   function mapDispatchToProps(dispatch) {
@@ -93,12 +97,12 @@ ArticleList = connect(
 
 function asyncThunkMiddleware({ dispatch, getState }) {
   return function(next) {
-    return async function (actionGen) {
-      if (!Symbol.asyncIterator in g) {
-        next();
+    return async function (action) {
+      if (action.constructor.name !== 'AsyncGenerator') {
+        return next(action);
       }
 
-      for await (a of actionGen) {
+      for await (let a of action) {
         dispatch(a);
       }
     }
@@ -107,9 +111,8 @@ function asyncThunkMiddleware({ dispatch, getState }) {
 
 const store = createStore(
   Reducer,
-  Immutable.Map(),
   compose(
-    asyncThunkMiddleware,
+    applyMiddleware(asyncThunkMiddleware),
     window.devToolsExtension ? window.devToolsExtension(): f => f
   )
 );
